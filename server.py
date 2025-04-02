@@ -2,8 +2,7 @@
 from mcp.server.fastmcp import FastMCP, Context, Image
 from typing import Dict, List, Optional, Any, Union
 import logging
-import os
-import json
+
 
 # Setup logging
 logging.basicConfig(
