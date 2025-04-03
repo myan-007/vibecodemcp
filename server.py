@@ -1,26 +1,12 @@
 #!/usr/bin/env python3
+from mcp.server.fastmcp import FastMCP, Context, Image
+from typing import Dict, List, Optional, Any, Union
+import logging
 import os
 import json
 import uuid
 import shutil
-import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
-from mcp.server.fastmcp import FastMCP, Context, Image
-
-# Import server templates
-from server_templates import (
-    BASIC_TOOL_TEMPLATE,
-    STRING_TOOL_TEMPLATE,
-    NUMBER_TOOL_TEMPLATE,
-    LIST_TOOL_TEMPLATE,
-    DICT_TOOL_TEMPLATE,
-    ASYNC_TOOL_TEMPLATE,
-    CONTEXT_TOOL_TEMPLATE,
-    FILE_TOOL_TEMPLATE,
-    WEB_API_TOOL_TEMPLATE,
-    DATABASE_TOOL_TEMPLATE
-)
 
 # Constants
 DATABASE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "servers_db.json")
@@ -335,8 +321,6 @@ def help_prompt() -> str:
     - create_server - Create a new MCP server
     - list_servers - List all managed MCP servers
     - remove_server - Remove a server by name
-    - add_tool_to_server - Add a tool to an existing server
-    - quick_tool - Add a tool to a server using a template
     - read_file - Read the contents of any file by path
     - echo - Echo a message back
     - process_data - Process data with progress reporting
@@ -345,65 +329,9 @@ def help_prompt() -> str:
     """
 
 
-# Add quick-tool tool - simplified tool creation
-@mcp.tool()
-def quick_tool(server_name: str, tool_name: str, tool_description: str, tool_type: str = "basic") -> Dict[str, Any]:
-    """
-    Add a basic tool to a server using a template
-    
-    Args:
-        server_name: Name of the server to add the tool to
-        tool_name: Name of the tool to add
-        tool_description: Description of the tool's functionality
-        tool_type: Template type (basic, string, number, list, dict, async, context, file, web, db)
-    
-    Returns:
-        Information about the added tool
-    """
-    # Validate tool_type
-    valid_types = ["basic", "string", "number", "list", "dict", "async", "context", "file", "web", "db"]
-    if tool_type not in valid_types:
-        raise ValueError(f"Invalid tool type. Must be one of: {', '.join(valid_types)}")
-    
-    # Get template based on tool_type
-    template = None
-    params = ""
-    
-    if tool_type == "basic":
-        template = BASIC_TOOL_TEMPLATE
-    elif tool_type == "string":
-        template = STRING_TOOL_TEMPLATE
-        params = "message:str"
-    elif tool_type == "number":
-        template = NUMBER_TOOL_TEMPLATE
-        params = "a:float, b:float"
-    elif tool_type == "list":
-        template = LIST_TOOL_TEMPLATE
-        params = "items:List[str]"
-    elif tool_type == "dict":
-        template = DICT_TOOL_TEMPLATE
-        params = "data:Dict[str, Any]"
-    elif tool_type == "async":
-        template = ASYNC_TOOL_TEMPLATE
-        params = "query:str"
-    elif tool_type == "context":
-        template = CONTEXT_TOOL_TEMPLATE
-        params = "data_type:str, ctx:Context"
-    elif tool_type == "file":
-        template = FILE_TOOL_TEMPLATE
-        params = "file_path:str"
-    elif tool_type == "web":
-        template = WEB_API_TOOL_TEMPLATE
-        params = "query:str"
-    elif tool_type == "db":
-        template = DATABASE_TOOL_TEMPLATE
-        params = "query:str"
-    
-    # Format the template with the tool name and description
-    tool_code = template.format(tool_name=tool_name, tool_description=tool_description)
-    
-    # Use add_tool_to_server to add the tool
-    return add_tool_to_server(server_name, tool_name, tool_description, tool_code, params)
-
-
 if __name__ == "__main__":
+    try:
+        # Run the MCP server
+        mcp.run()
+    except KeyboardInterrupt:
+        logger.info("Server stopped by user")
