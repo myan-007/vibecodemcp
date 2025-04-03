@@ -16,6 +16,8 @@ from server import (
     list_servers, 
     remove_server,
     read_file,
+    add_tool_to_server,
+    find_server_by_name,
     DATABASE_FILE, 
     SERVERS_DIR, 
     load_database,
@@ -217,6 +219,121 @@ class TestServerTools(unittest.TestCase):
             read_file(self.test_data_dir)
         
         self.assertIn("Not a file", str(context.exception))
+        
+    def test_add_tool_to_server(self):
+        """Test adding a tool to a server."""
+        # Create a test server
+        server = create_server("Tool Test Server", "Server for testing tool addition")
+        server_id = server["id"]
+        server_location = server["location"]
+        
+        # Tool parameters
+        tool_name = "hello_world"
+        tool_description = "A simple hello world tool"
+        tool_code = "return f\"Hello, {name}!\""
+        params = "name:str"
+        
+        # Add the tool
+        result = add_tool_to_server("Tool Test Server", tool_name, tool_description, tool_code, params)
+        
+        # Check the result
+        self.assertEqual(result["server"], "Tool Test Server")
+        self.assertEqual(result["tool"]["name"], "hello_world")
+        self.assertEqual(result["tool"]["description"], "A simple hello world tool")
+        self.assertEqual(len(result["tool"]["parameters"]), 1)
+        self.assertEqual(result["tool"]["parameters"][0]["name"], "name")
+        self.assertEqual(result["tool"]["parameters"][0]["type"], "str")
+        
+        # Check that the server.py file was modified
+        server_file = os.path.join(server_location, "server.py")
+        with open(server_file, 'r') as f:
+            content = f.read()
+            self.assertIn("@mcp.tool()", content)
+            self.assertIn("def hello_world(name: str)", content)
+            self.assertIn("A simple hello world tool", content)
+            self.assertIn("return f\"Hello, {name}!\"", content)
+        
+        # Check that the tool was added to the database
+        db = load_database()
+        self.assertIn(server_id, db["servers"])
+        self.assertIn("tools", db["servers"][server_id])
+        self.assertEqual(db["servers"][server_id]["tool_count"], 1)
+        
+        # Get the tool from the database
+        tool_id = None
+        for tid, tool_data in db["servers"][server_id]["tools"].items():
+            if tool_data["name"] == "hello_world":
+                tool_id = tid
+                break
+        
+        self.assertIsNotNone(tool_id, "Tool not found in database")
+        tool_data = db["servers"][server_id]["tools"][tool_id]
+        self.assertEqual(tool_data["name"], "hello_world")
+        self.assertEqual(tool_data["description"], "A simple hello world tool")
+        
+        # Clean up
+        remove_server("Tool Test Server")
+        
+    def test_add_tool_to_server_with_code(self):
+        """Test adding a tool to a server with provided server code."""
+        # Create a test server
+        server = create_server("Code Test Server", "Server for testing tool addition with code")
+        server_id = server["id"]
+        server_location = server["location"]
+        
+        # Create custom server code
+        custom_server_code = """#!/usr/bin/env python3
+from mcp.server.fastmcp import FastMCP, Context
+
+# Create an MCP server
+mcp = FastMCP("Code Test Server")
+
+# This is a custom server file
+# with special formatting
+
+if __name__ == "__main__":
+    try:
+        # Run the MCP server
+        mcp.run()
+    except KeyboardInterrupt:
+        print("Server stopped by user")
+"""
+        
+        # Tool parameters
+        tool_name = "custom_hello"
+        tool_description = "A custom hello world tool"
+        tool_code = "return f\"Custom hello, {name}!\""
+        params = "name:str"
+        
+        # Add the tool with custom code
+        result = add_tool_to_server(
+            "Code Test Server", 
+            tool_name, 
+            tool_description, 
+            tool_code, 
+            params,
+            custom_server_code
+        )
+        
+        # Check the result
+        self.assertEqual(result["server"], "Code Test Server")
+        self.assertEqual(result["tool"]["name"], "custom_hello")
+        
+        # Check that the server file was completely rewritten
+        server_file = os.path.join(server_location, "server.py")
+        with open(server_file, 'r') as f:
+            content = f.read()
+            self.assertIn("# This is a custom server file", content)
+            self.assertIn("def custom_hello(name: str)", content)
+            self.assertIn("Custom hello, {name}", content)
+        
+        # Check that the database was updated
+        db = load_database()
+        self.assertEqual(db["servers"][server_id]["tool_count"], 1)
+        
+        # Clean up
+        remove_server("Code Test Server")
+
 
 
 if __name__ == "__main__":
