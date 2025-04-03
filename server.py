@@ -101,7 +101,7 @@ def create_server(project_name: str, description: str) -> Dict[str, Any]:
     server_id = str(uuid.uuid4())
     
     # Define server location
-    server_location = os.path.join(SERVERS_DIR, server_id)
+    server_location = os.path.join(SERVERS_DIR, project_name)
     
     # Create server directory
     os.makedirs(server_location, exist_ok=True)
@@ -110,18 +110,17 @@ def create_server(project_name: str, description: str) -> Dict[str, Any]:
     server_file = os.path.join(server_location, "server.py")
     with open(server_file, "w") as f:
         f.write(f'''#!/usr/bin/env python3
-            from mcp.server.fastmcp import FastMCP, Context
-
-            # Create an MCP server
-            mcp = FastMCP("{project_name}")
-
-            if __name__ == "__main__":
-                try:
-                    # Run the MCP server
-                    mcp.run()
-                except KeyboardInterrupt:
-                    print("Server stopped by user")
-        ''')
+from mcp.server.fastmcp import FastMCP, Context
+                
+# Create an MCP server
+mcp = FastMCP("{project_name}")
+if __name__ == "__main__":
+    try:
+        # Run the MCP server
+        mcp.run()
+    except KeyboardInterrupt:
+        print("Server stopped by user")
+''')
     
     # Make the file executable
     os.chmod(server_file, 0o755)

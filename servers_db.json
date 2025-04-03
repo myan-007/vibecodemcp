@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "51ab2174-a92f-431f-88ae-101fa06bcdb7": {
+      "id": "51ab2174-a92f-431f-88ae-101fa06bcdb7",
+      "name": "SumGmail",
+      "description": "A server that summarizes daily emails and categorizes them into relevant groups for easy review.",
+      "location": "/Users/meet/Documents/python/projects/mcp/vibecodemcp/mcp-servers/SumGmail",
+      "tool_count": 0,
+      "tools": {}
+    }
+  }
+}
