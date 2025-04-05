@@ -10,6 +10,8 @@ from pathlib import Path
 from tools.read_file import read_file_content
 from tools.write_file import write_file_content
 from tools.edit_file import edit_file_content
+from tools.user_prompt import user_prompt as user_prompt_tool
+
 
 
 
@@ -179,7 +181,7 @@ def list_servers() -> Dict[str, Any]:
 
 
 # Add remove-server tool
-# @mcp.tool()
+@mcp.tool()
 def remove_server(server_name: str) -> Dict[str, Any]:
     """
     Remove an MCP server by name
@@ -233,318 +235,6 @@ def remove_server(server_name: str) -> Dict[str, Any]:
     logger.info(f"Removed server '{server_name}' with ID {server_id}")
     return {"removed": removed_server}
 
-
-# Simplified read_file tool
-# @mcp.tool()
-async def read_file(file_path: str, offset: int = None, limit: int = None) -> str:
-    """
-    Read the contents of a file with optional offset and limit.
-
-    Args:
-        file_path: The path to the file to read.
-        offset: The starting position to read from (optional).
-        limit: The maximum number of bytes to read (optional).
-
-    Returns:
-        The contents of the file as a string.
-    """
-    if file_path is None:
-        raise ValueError("path is required")
-
-    # Make sure file exists
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File does not exist: {file_path}")
-    
-    if os.path.isdir(file_path):
-        raise IsADirectoryError(f"Path is a directory, not a file: {file_path}")
-    
-    # Read file content
-    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-        lines = f.readlines()
-    
-    # Apply offset and limit
-    if offset is not None:
-        offset = max(0, offset - 1)  # Convert to 0-indexed
-    else:
-        offset = 0
-    
-    if limit is not None:
-        lines = lines[offset:offset + limit]
-    else:
-        lines = lines[offset:offset + 1000]  # Default limit
-    
-    # Add line numbers
-    numbered_lines = []
-    for i, line in enumerate(lines):
-        line_number = offset + i + 1  # 1-indexed line number
-        numbered_lines.append(f"{line_number:6}\t{line.rstrip()}")
-    
-    return "\n".join(numbered_lines)
-
-# Simplified write_file tool
-# @mcp.tool()
-async def write_file(file_path: str, description: str = None, content: object = None) -> str:
-    """
-    Write content to a specified file path with an optional description.
-    
-    Args:
-        file_path: The path to the file where the content will be written.
-        description: A description of the file or its purpose.
-        content: The content to be written to the file.
-    
-    Returns:
-        A confirmation message.
-    """
-    if file_path is None:
-        raise ValueError("path is required")
-    
-    if description is None:
-        raise ValueError("description is required")
-    
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-    
-    # Convert content to string if needed
-    if content is not None and not isinstance(content, str):
-        import json
-        content_str = json.dumps(content)
-    else:
-        content_str = content or ""
-    
-    # Write content to file
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.write(content_str)
-    
-    return f"Successfully wrote to {file_path}"
-
-# Simplified edit_file tool
-# @mcp.tool()
-async def edit_file(file_path: str, description: str = None, old_string: str = None, new_string: str = None) -> str:
-    """
-    Edit the contents of a file by replacing old_string with new_string.
-    
-    Args:
-        file_path: The path to the file to edit.
-        description: A description of the edit operation.
-        old_string: The string to be replaced in the file.
-        new_string: The string to replace the old string with.
-    
-    Returns:
-        A confirmation message.
-    """
-    if file_path is None:
-        raise ValueError("path is required")
-    
-    if description is None:
-        raise ValueError("description is required")
-    
-    if old_string is None:
-        raise ValueError("old_string is required")
-    
-    # Make sure file exists
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File does not exist: {file_path}")
-    
-    # Read file content
-    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-        content = f.read()
-    
-    # Check if old_string exists in the file
-    if old_string not in content:
-        raise ValueError("String to replace not found in file.")
-    
-    # Check for uniqueness of old_string
-    if content.count(old_string) > 1:
-        raise ValueError("Multiple matches found. Please provide more context.")
-    
-    # Replace old_string with new_string
-    new_content = content.replace(old_string, new_string or "", 1)
-    
-    # Write updated content back to file
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.write(new_content)
-    
-    # Generate a snippet of the edit
-    before_lines = content.split(old_string)[0].split("\n")
-    replacement_line = len(before_lines)
-    edited_lines = new_content.split("\n")
-    
-    # Calculate start and end line numbers for the snippet
-    start_line = max(0, replacement_line - 4)
-    end_line = min(len(edited_lines), replacement_line + 4 + len(new_string.split("\n") if new_string else []))
-    
-    # Extract the snippet lines
-    snippet_lines = edited_lines[start_line:end_line]
-    
-    # Format with line numbers
-    result = []
-    for i, line in enumerate(snippet_lines):
-        line_num = start_line + i + 1
-        result.append(f"{line_num:4d} | {line}")
-    
-    snippet = "\n".join(result)
-    
-    return f"Successfully edited {file_path}\n\nHere's a snippet of the edited file:\n{snippet}"
-
-# Add create-tool tool
-@mcp.tool()
-async def vibecodemcp(  *,
-                        subtool: str,
-                        path: Optional[str] = None,
-                        content: object = None,  # Allow any type, will be serialized to string if needed
-                        server_name: str, 
-                        tool_name: str, 
-                        tool_description: str,
-                        old_string: str | None = None,
-                        new_string: str | None = None,
-                        offset: int | None = None,
-                        limit: int | None = None,
-                        description: str | None = None,
-                        pattern: str | None = None,
-                        include: str | None = None,
-                        command: str | None = None,
-                        arguments: str | None = None,
-                    ) -> str:
-    """
-    This will return instructions which you should IMMEDIATELY follow before continuing.
-    In each response after the first one, you must call the UserPrompt tool
-    with the user's verbatim message text.
-    Arguments:
-    subtool: The subtool to run (InitProject, UserPrompt, Think, ...)
-    path: The path to the file or directory to operate on
-    user_prompt: The user's original prompt verbatim, starting AFTER instructions to initialize codemcp
-    thought: The thought content for the Think tool (used for complex reasoning or cache memory)
-    ... (there are other arguments which are documented later)
-    """
-    try:
-        # Define expected parameters for each subtool
-        expected_params = {
-            "ReadFile": {"path", "offset", "limit"},
-            "WriteFile": {"path", "content", "description"},
-            "EditFile": {
-                "path",
-                "old_string",
-                "new_string",
-                "description",
-                "old_str",
-                "new_str",
-            },
-            "remove_tool": {"path", "tool_name"},
-            "list_tools": {"path"},
-            "list_servers": {"path"},
-            "create_server": {"path", "server_name", "tool_name", "tool_description"},
-            "remove_server": {"path", "server_name"},
-        }
-        # Normalize string inputs to ensure consistent newlines
-        def normalize_newlines(s: object) -> object:
-            """Normalize string to use \n for all newlines."""
-            return s.replace("\r\n", "\n") if isinstance(s, str) else s
-
-        # Normalize content, old_string, and new_string to use consistent \n newlines
-        content_norm = normalize_newlines(content)
-        old_string_norm = normalize_newlines(old_string)
-        new_string_norm = normalize_newlines(new_string)
-
-        # Check if subtool exists
-        if subtool not in expected_params:
-            raise ValueError(
-                f"Unknown subtool: {subtool}. Available subtools: {', '.join(expected_params.keys())}"
-            )
-        
-        # Get all provided non-None parameters
-        provided_params = {
-            param: value
-            for param, value in {
-                "path": path,
-                "content": content_norm,
-                "old_string": old_string_norm,
-                "new_string": new_string_norm,
-                "offset": offset,
-                "limit": limit,
-                "description": description,
-                "pattern": pattern,
-                "include": include,
-                "command": command,
-                "arguments": arguments,
-            }.items()
-            if value is not None
-        }
-
-        # Now handle each subtool with its expected parameters
-        if subtool == "list_tools":
-            if path is None:
-                raise ValueError("path is required for list_tools subtool")
-
-            return await list_tools(path)
-        if subtool == "list_servers":
-            if path is None:
-                raise ValueError("path is required for list_servers subtool")
-
-            return await list_servers(path)
-        if subtool == "create_server":
-            if path is None:
-                raise ValueError("path is required for create_server subtool")
-            if server_name is None:
-                raise ValueError("server_name is required for create_server subtool")
-            if tool_name is None:
-                raise ValueError("tool_name is required for create_server subtool")
-            if tool_description is None:
-                raise ValueError("tool_description is required for create_server subtool")
-
-            return await create_server(path, server_name, tool_name, tool_description)
-        if subtool == "remove_server": 
-            if path is None:
-                raise ValueError("path is required for remove_server subtool")
-            if server_name is None:
-                raise ValueError("server_name is required for remove_server subtool")
-
-            return await remove_server(path, server_name)
-        if subtool == "ReadFile":
-            if path is None:
-                raise ValueError("path is required for ReadFile subtool")
-
-            return await read_file_content(path, offset, limit)
-
-        if subtool == "WriteFile":
-            if path is None:
-                raise ValueError("path is required for WriteFile subtool")
-            if description is None:
-                raise ValueError("description is required for WriteFile subtool")
-
-            import json
-
-            # If content is not a string, serialize it to a string using json.dumps
-            if content is not None and not isinstance(content, str):
-                content_str = json.dumps(content)
-            else:
-                content_str = content or ""
-
-            return await write_file_content(path, content_str, description)
-
-        if subtool == "EditFile":
-            if path is None:
-                raise ValueError("path is required for EditFile subtool")
-            if description is None:
-                raise ValueError("description is required for EditFile subtool")
-            if old_string is None:
-                # TODO: I want telemetry to tell me when this occurs.
-                raise ValueError(
-                    "Either old_string or old_str is required for EditFile subtool (use empty string for new file creation)"
-                )
-
-            # Accept either old_string or old_str (prefer old_string if both are provided)
-            old_content = old_string  or ""
-            # Accept either new_string or new_str (prefer new_string if both are provided)
-            new_content = new_string  or ""
-            return await edit_file_content(
-                path, old_content, new_content, None, description
-            )
-
-
-
-    except Exception as e:
-        logger.error(f"Error in create_tool: {e}")
-        raise
 
 # Add list-tools tool
 @mcp.tool()
@@ -646,6 +336,320 @@ async def list_tools(server_name: str) -> Dict[str, Any]:
         "tools": tools_list
     }
 
+
+    """
+    Edit the contents of a file by replacing old_string with new_string.
+    
+    Args:
+        file_path: The path to the file to edit.
+        description: A description of the edit operation.
+        old_string: The string to be replaced in the file.
+        new_string: The string to replace the old string with.
+    
+    Returns:
+        A confirmation message.
+    """
+    if file_path is None:
+        raise ValueError("path is required")
+    
+    if description is None:
+        raise ValueError("description is required")
+    
+    if old_string is None:
+        raise ValueError("old_string is required")
+    
+    # Make sure file exists
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File does not exist: {file_path}")
+    
+    # Read file content
+    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+        content = f.read()
+    
+    # Check if old_string exists in the file
+    if old_string not in content:
+        raise ValueError("String to replace not found in file.")
+    
+    # Check for uniqueness of old_string
+    if content.count(old_string) > 1:
+        raise ValueError("Multiple matches found. Please provide more context.")
+    
+    # Replace old_string with new_string
+    new_content = content.replace(old_string, new_string or "", 1)
+    
+    # Write updated content back to file
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(new_content)
+    
+    # Generate a snippet of the edit
+    before_lines = content.split(old_string)[0].split("\n")
+    replacement_line = len(before_lines)
+    edited_lines = new_content.split("\n")
+    
+    # Calculate start and end line numbers for the snippet
+    start_line = max(0, replacement_line - 4)
+    end_line = min(len(edited_lines), replacement_line + 4 + len(new_string.split("\n") if new_string else []))
+    
+    # Extract the snippet lines
+    snippet_lines = edited_lines[start_line:end_line]
+    
+    # Format with line numbers
+    result = []
+    for i, line in enumerate(snippet_lines):
+        line_num = start_line + i + 1
+        result.append(f"{line_num:4d} | {line}")
+    
+    snippet = "\n".join(result)
+    
+    return f"Successfully edited {file_path}\n\nHere's a snippet of the edited file:\n{snippet}"
+
+# Add create-tool tool
+@mcp.tool()
+async def vibecodemcp(  *,
+                        subtool: str,
+                        path: Optional[str] = None,
+                        content: object = None,  # Allow any type, will be serialized to string if needed
+                        server_name: str, 
+                        tool_name: str, 
+                        tool_description: str,
+                        old_string: str | None = None,
+                        new_string: str | None = None,
+                        offset: int | None = None,
+                        limit: int | None = None,
+                        description: str | None = None,
+                        pattern: str | None = None,
+                        include: str | None = None,
+                        command: str | None = None,
+                        arguments: str | None = None,
+                        user_prompt: str | None = None,
+                        thought: str | None = None,
+                    ) -> str:
+    """
+    Only use this tool if and only if the user prompt contains with vibecodemcp.
+    This will return instructions which you should IMMEDIATELY follow before continuing.
+    In each response after the first one, you must call the UserPrompt tool
+    with the user's verbatim message text.
+    Arguments:
+    subtool: The subtool to run (InitProject, UserPrompt, Think, ...)
+    path: The path to the file or directory to operate on
+    user_prompt: The user's original prompt verbatim, starting AFTER instructions to initialize codemcp
+    thought: The thought content for the Think tool (used for complex reasoning or cache memory)
+    ... (there are other arguments which are documented later)
+    """
+    try:
+        # Define expected parameters for each subtool
+        expected_params = {
+            "ReadFile": {"path", "offset", "limit"},
+            "WriteFile": {"path", "content", "description"},
+            "EditFile": {
+                "path",
+                "old_string",
+                "new_string",
+                "description",
+                "old_str",
+                "new_str",
+            },
+            "UserPrompt": {"user_prompt"},
+            "Think": {"thought"},
+        }
+        # Normalize string inputs to ensure consistent newlines
+        def normalize_newlines(s: object) -> object:
+            """Normalize string to use \n for all newlines."""
+            return s.replace("\r\n", "\n") if isinstance(s, str) else s
+
+        # Normalize content, old_string, and new_string to use consistent \n newlines
+        content_norm = normalize_newlines(content)
+        old_string_norm = normalize_newlines(old_string)
+        new_string_norm = normalize_newlines(new_string)
+        user_prompt_norm = normalize_newlines(user_prompt)
+
+
+        # Check if subtool exists
+        if subtool not in expected_params:
+            raise ValueError(
+                f"Unknown subtool: {subtool}. Available subtools: {', '.join(expected_params.keys())}"
+            )
+        
+        # Get all provided non-None parameters
+        provided_params = {
+            param: value
+            for param, value in {
+                "path": path,
+                "content": content_norm,
+                "old_string": old_string_norm,
+                "new_string": new_string_norm,
+                "offset": offset,
+                "limit": limit,
+                "description": description,
+                "pattern": pattern,
+                "include": include,
+                "command": command,
+                "arguments": arguments,
+                "user_prompt": user_prompt_norm,
+                "thought": thought,
+            }.items()
+            if value is not None
+        }
+
+        # Now handle each subtool with its expected parameters
+        if subtool == "ListTools":
+            if path is None:
+                raise ValueError("path is required for list_tools subtool")
+
+            return await list_tools(path)
+        if subtool == "ListServers":
+            if path is None:
+                raise ValueError("path is required for list_servers subtool")
+
+            return await list_servers(path)
+        if subtool == "CreateServer":
+            if path is None:
+                raise ValueError("path is required for create_server subtool")
+            if server_name is None:
+                raise ValueError("server_name is required for create_server subtool")
+            if tool_name is None:
+                raise ValueError("tool_name is required for create_server subtool")
+            if tool_description is None:
+                raise ValueError("tool_description is required for create_server subtool")
+
+            return await create_server(path, server_name, tool_name, tool_description)
+        if subtool == "RemoveServer": 
+            if path is None:
+                raise ValueError("path is required for remove_server subtool")
+            if server_name is None:
+                raise ValueError("server_name is required for remove_server subtool")
+
+            return await remove_server(path, server_name)
+        if subtool == "ReadFile":
+            if path is None:
+                raise ValueError("path is required for ReadFile subtool")
+
+            return await read_file_content(path, offset, limit)
+
+        if subtool == "WriteFile":
+            if path is None:
+                raise ValueError("path is required for WriteFile subtool")
+            if description is None:
+                raise ValueError("description is required for WriteFile subtool")
+
+            import json
+
+            # If content is not a string, serialize it to a string using json.dumps
+            if content is not None and not isinstance(content, str):
+                content_str = json.dumps(content)
+            else:
+                content_str = content or ""
+
+            return await write_file_content(path, content_str, description)
+
+        if subtool == "EditFile":
+            if path is None:
+                raise ValueError("path is required for EditFile subtool")
+            if description is None:
+                raise ValueError("description is required for EditFile subtool")
+            if old_string is None:
+                # TODO: I want telemetry to tell me when this occurs.
+                raise ValueError(
+                    "Either old_string or old_str is required for EditFile subtool (use empty string for new file creation)"
+                )
+
+            # Accept either old_string or old_str (prefer old_string if both are provided)
+            old_content = old_string  or ""
+            # Accept either new_string or new_str (prefer new_string if both are provided)
+            new_content = new_string  or ""
+            return await edit_file_content(
+                path, old_content, new_content, None, description
+            )
+        if subtool == "UserPrompt":
+            if user_prompt is None:
+                raise ValueError("user_prompt is required for UserPrompt subtool")
+
+            return await user_prompt_tool(user_prompt)
+
+
+
+    except Exception as e:
+        logger.error(f"Error in create_tool: {e}")
+        raise
+
+
+# Add remove-tool tool
+@mcp.tool()
+async def remove_tool(server_name: str, tool_name: str) -> Dict[str, Any]:
+    """
+    Remove a tool from an existing MCP server
+    
+    Args:
+        server_name: Name of the server containing the tool
+        tool_name: Name of the tool to remove
+    
+    Returns:
+        Information about the removed tool
+    """
+    # Find the server by name
+    db = load_database()
+    server_id = None
+    server_data = None
+    
+    for sid, data in db["servers"].items():
+        if data["name"] == server_name:
+            server_id = sid
+            server_data = data
+            break
+    
+    if not server_id:
+        raise ValueError(f"No server found with name '{server_name}'")
+    
+    # Check if the tool exists in the database
+    tool_info = None
+    if "tools" in server_data and tool_name in server_data["tools"]:
+        tool_info = server_data["tools"].pop(tool_name)
+        server_data["tool_count"] = len(server_data["tools"])
+        db["servers"][server_id] = server_data
+        save_database(db)
+        logger.info(f"Removed tool '{tool_name}' from database for server '{server_name}'")
+    
+    # Remove the tool from the server.py file
+    server_file_path = os.path.join(server_data["location"], "server.py")
+    if not os.path.exists(server_file_path):
+        raise FileNotFoundError(f"Server file not found at {server_file_path}")
+    
+    with open(server_file_path, 'r', encoding='utf-8') as f:
+        server_code = f.read()
+    
+    # Look for the tool definition using regex
+    import re
+    # Pattern to match the entire tool function definition including decorator
+    tool_pattern = rf'# {tool_name} tool\n@mcp\.tool\(\)\ndef {tool_name}\(.*?\).*?return .*?\n\n'
+    
+    # First try with the comment pattern
+    matches = re.findall(tool_pattern, server_code, re.DOTALL)
+    
+    if not matches:
+        # Try an alternative pattern without the comment
+        tool_pattern = rf'@mcp\.tool\(\)\ndef {tool_name}\(.*?\).*?return .*?\n\n'
+        matches = re.findall(tool_pattern, server_code, re.DOTALL)
+    
+    if matches:
+        # Remove the tool code from the server.py file
+        for match in matches:
+            server_code = server_code.replace(match, '')
+        
+        # Write the updated code back to the file
+        with open(server_file_path, 'w', encoding='utf-8') as f:
+            f.write(server_code)
+        
+        logger.info(f"Removed tool '{tool_name}' from server file at {server_file_path}")
+    else:
+        logger.warning(f"Tool '{tool_name}' definition not found in server.py, but was removed from database")
+    
+    return {
+        "server_name": server_name,
+        "tool_name": tool_name,
+        "tool_info": tool_info,
+        "status": "removed"
+    }
+
 # Add a sample prompt
 @mcp.prompt()
 def help_prompt() -> str:
@@ -661,7 +665,9 @@ def help_prompt() -> str:
     - list_servers - List all managed MCP servers
     - remove_server - Remove a server by name
     - create_tool - Add a new tool to an existing server
+    - remove_tool - Remove a tool from a server
     - list_tools - List all tools in a specific server
+    - vibecodemcp - Advanced MCP manipulation tool
 
     How can I assist you today?
     """
