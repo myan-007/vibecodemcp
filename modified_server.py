@@ -485,7 +485,7 @@ async def create_tool(  *,
             else:
                 content_str = content or ""
 
-            return await write_file_content(path, content_str, description, chat_id)
+            return await write_file_content(path, content_str, description)
 
         if subtool == "EditFile":
             if path is None:
@@ -512,6 +512,106 @@ async def create_tool(  *,
         logger.error(f"Error in create_tool: {e}")
         raise
 
+# Add list-tools tool
+@mcp.tool()
+async def list_tools(server_name: str) -> Dict[str, Any]:
+    """
+    List all tools available in a specific MCP server
+    
+    Args:
+        server_name: Name of the server to list tools for
+    
+    Returns:
+        Information about all tools in the specified server
+    """
+    # Find the server by name
+    db = load_database()
+    server_id = None
+    server_data = None
+    
+    for sid, data in db["servers"].items():
+        if data["name"] == server_name:
+            server_id = sid
+            server_data = data
+            break
+    
+    if not server_id:
+        raise ValueError(f"No server found with name '{server_name}'")
+    
+    # Check if server has tools registered
+    tools_list = []
+    
+    if "tools" in server_data and server_data["tools"]:
+        for tool_name, tool_info in server_data["tools"].items():
+            # Get parameters info if available
+            params_info = []
+            if "parameters" in tool_info and tool_info["parameters"]:
+                for param in tool_info["parameters"]:
+                    params_info.append({
+                        "name": param.get("name", ""),
+                        "type": param.get("type", ""),
+                        "description": param.get("description", "")
+                    })
+            
+            tools_list.append({
+                "name": tool_name,
+                "description": tool_info.get("description", "No description available"),
+                "parameters": params_info
+            })
+    
+    # If no tools are found in the database, try reading the server.py file
+    # This is useful if tools were added manually without using create_tool
+    if not tools_list:
+        server_file_path = os.path.join(server_data["location"], "server.py")
+        if os.path.exists(server_file_path):
+            with open(server_file_path, 'r', encoding='utf-8') as f:
+                server_code = f.read()
+            
+            # Look for @mcp.tool() decorators to find tools
+            import re
+            tool_pattern = r'@mcp\.tool\(\).*?def\s+(\w+)\s*\((.*?)\).*?"""(.*?)"""'
+            matches = re.findall(tool_pattern, server_code, re.DOTALL)
+            
+            for match in matches:
+                tool_name = match[0]
+                params_str = match[1]
+                docstring = match[2].strip()
+                
+                # Parse docstring to get description
+                description = docstring.split('\n')[0].strip()
+                
+                # Parse parameters
+                params_info = []
+                if params_str.strip():
+                    param_list = [p.strip() for p in params_str.split(',')]
+                    for param in param_list:
+                        if ':' in param:
+                            param_parts = param.split(':')
+                            param_name = param_parts[0].strip()
+                            param_type = param_parts[1].strip()
+                            if '=' in param_type:
+                                param_type = param_type.split('=')[0].strip()
+                            
+                            params_info.append({
+                                "name": param_name,
+                                "type": param_type,
+                                "description": "Parameter extracted from code"
+                            })
+                
+                tools_list.append({
+                    "name": tool_name,
+                    "description": description,
+                    "parameters": params_info
+                })
+    
+    logger.info(f"Listed {len(tools_list)} tools for server '{server_name}'")
+    
+    return {
+        "server_name": server_name,
+        "tools_count": len(tools_list),
+        "tools": tools_list
+    }
+
 # Add a sample prompt
 @mcp.prompt()
 def help_prompt() -> str:
@@ -527,6 +627,7 @@ def help_prompt() -> str:
     - list_servers - List all managed MCP servers
     - remove_server - Remove a server by name
     - create_tool - Add a new tool to an existing server
+    - list_tools - List all tools in a specific server
     - read_file - Read the contents of any file by path
     - write_file - Write content to a file
     - edit_file - Edit the contents of a file
