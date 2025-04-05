@@ -179,7 +179,7 @@ def list_servers() -> Dict[str, Any]:
 
 
 # Add remove-server tool
-@mcp.tool()
+# @mcp.tool()
 def remove_server(server_name: str) -> Dict[str, Any]:
     """
     Remove an MCP server by name
@@ -233,8 +233,9 @@ def remove_server(server_name: str) -> Dict[str, Any]:
     logger.info(f"Removed server '{server_name}' with ID {server_id}")
     return {"removed": removed_server}
 
+
 # Simplified read_file tool
-@mcp.tool()
+# @mcp.tool()
 async def read_file(file_path: str, offset: int = None, limit: int = None) -> str:
     """
     Read the contents of a file with optional offset and limit.
@@ -281,7 +282,7 @@ async def read_file(file_path: str, offset: int = None, limit: int = None) -> st
     return "\n".join(numbered_lines)
 
 # Simplified write_file tool
-@mcp.tool()
+# @mcp.tool()
 async def write_file(file_path: str, description: str = None, content: object = None) -> str:
     """
     Write content to a specified file path with an optional description.
@@ -317,7 +318,7 @@ async def write_file(file_path: str, description: str = None, content: object = 
     return f"Successfully wrote to {file_path}"
 
 # Simplified edit_file tool
-@mcp.tool()
+# @mcp.tool()
 async def edit_file(file_path: str, description: str = None, old_string: str = None, new_string: str = None) -> str:
     """
     Edit the contents of a file by replacing old_string with new_string.
@@ -387,7 +388,7 @@ async def edit_file(file_path: str, description: str = None, old_string: str = N
 
 # Add create-tool tool
 @mcp.tool()
-async def create_tool(  *,
+async def vibecodemcp(  *,
                         subtool: str,
                         path: Optional[str] = None,
                         content: object = None,  # Allow any type, will be serialized to string if needed
@@ -427,7 +428,12 @@ async def create_tool(  *,
                 "description",
                 "old_str",
                 "new_str",
-            }
+            },
+            "remove_tool": {"path", "tool_name"},
+            "list_tools": {"path"},
+            "list_servers": {"path"},
+            "create_server": {"path", "server_name", "tool_name", "tool_description"},
+            "remove_server": {"path", "server_name"},
         }
         # Normalize string inputs to ensure consistent newlines
         def normalize_newlines(s: object) -> object:
@@ -465,6 +471,34 @@ async def create_tool(  *,
         }
 
         # Now handle each subtool with its expected parameters
+        if subtool == "list_tools":
+            if path is None:
+                raise ValueError("path is required for list_tools subtool")
+
+            return await list_tools(path)
+        if subtool == "list_servers":
+            if path is None:
+                raise ValueError("path is required for list_servers subtool")
+
+            return await list_servers(path)
+        if subtool == "create_server":
+            if path is None:
+                raise ValueError("path is required for create_server subtool")
+            if server_name is None:
+                raise ValueError("server_name is required for create_server subtool")
+            if tool_name is None:
+                raise ValueError("tool_name is required for create_server subtool")
+            if tool_description is None:
+                raise ValueError("tool_description is required for create_server subtool")
+
+            return await create_server(path, server_name, tool_name, tool_description)
+        if subtool == "remove_server": 
+            if path is None:
+                raise ValueError("path is required for remove_server subtool")
+            if server_name is None:
+                raise ValueError("server_name is required for remove_server subtool")
+
+            return await remove_server(path, server_name)
         if subtool == "ReadFile":
             if path is None:
                 raise ValueError("path is required for ReadFile subtool")
@@ -628,9 +662,6 @@ def help_prompt() -> str:
     - remove_server - Remove a server by name
     - create_tool - Add a new tool to an existing server
     - list_tools - List all tools in a specific server
-    - read_file - Read the contents of any file by path
-    - write_file - Write content to a file
-    - edit_file - Edit the contents of a file
 
     How can I assist you today?
     """
