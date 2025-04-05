@@ -7,6 +7,10 @@ import json
 import uuid
 import shutil
 from pathlib import Path
+from tools.read_file import read_file_content
+from tools.write_file import write_file_content
+from tools.edit_file import edit_file_content
+
 
 # Constants
 DATABASE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "servers_db.json")
@@ -245,67 +249,134 @@ def remove_server(server_name: str) -> Dict[str, Any]:
     return {"removed": removed_server}
 
 
+# add here a tool to create a tool for the server
+# parameters : tool name, tool description, tool functionality, tool 
+
+
+
+
+
 # Add read-file tool
 @mcp.tool()
-def read_file(file_path: str) -> Dict[str, Any]:
+async def read_file(file_path: str, offset: int | None = None,
+    limit: int | None = None) -> str:
     """
-    Read the contents of a file
+    Do not use this tool directly. Only call this tool from other tools.
+    Read the contents of a file with optional offset and limit.
     
     Args:
-        file_path: Path to the file to read
+        file_path: The path to the file to read.
+        offset: The starting position to read from (optional).
+        limit: The maximum number of bytes to read (optional).
     
     Returns:
-        The file contents and metadata
+        The contents of the file as a string.
+    
+    Raises:
+        ValueError: If the file_path is not provided.
     """
-    # Validate path
-    if not os.path.exists(file_path):
-        raise ValueError(f"File not found: {file_path}")
-    
-    if not os.path.isfile(file_path):
-        raise ValueError(f"Not a file: {file_path}")
-    
-    try:
-        # Read file content
-        with open(file_path, 'r') as f:
-            content = f.read()
-        
-        # Get file metadata
-        file_stat = os.stat(file_path)
-        file_size = file_stat.st_size
-        file_modified = file_stat.st_mtime
-        
-        # Get file extension
-        _, file_extension = os.path.splitext(file_path)
-        
-        logger.info(f"Read file: {file_path} ({file_size} bytes)")
-        return {
-            "path": file_path,
-            "content": content,
-            "size": file_size,
-            "modified": file_modified,
-            "extension": file_extension,
-            "is_binary": False
-        }
-    except UnicodeDecodeError:
-        # Handle binary files
-        logger.info(f"Binary file detected: {file_path}")
-        with open(file_path, 'rb') as f:
-            binary_content = f.read()
-        
-        file_stat = os.stat(file_path)
-        return {
-            "path": file_path,
-            "content": "<binary data>",
-            "size": file_stat.st_size,
-            "modified": file_stat.st_mtime,
-            "extension": os.path.splitext(file_path)[1],
-            "is_binary": True
-        }
-    except Exception as e:
-        logger.error(f"Error reading file {file_path}: {str(e)}")
-        raise ValueError(f"Error reading file: {str(e)}")
+    if file_path is None:
+        raise ValueError("path is required for ReadFile subtool")
+
+    return await read_file_content(file_path, offset, limit)
+
+@mcp.tool()
+
+async def write_file(file_path: str,
+                    description: str | None = None,
+                    content: object = None,  # Allow any type, will be serialized to string if needed
+                        ) -> str:
+    """
+    Do not use this tool directly. Only call this tool from other tools.
+    Writes content to a specified file path with an optional description.
+    Args:
+        file_path (str): The path to the file where the content will be written. 
+                        This parameter is required.
+        description (str | None): A description of the file or its purpose. 
+                                This parameter is required.
+        content (object): The content to be written to the file. If the content 
+                        is not a string, it will be serialized to a string 
+                        using `json.dumps`. Defaults to None.
+
+    Returns:
+        str: A confirmation or result string from the `write_file_content` function.
+
+    Raises:
+        ValueError: If `file_path` is None or `description` is None.
+
+    Notes:
+        - If `content` is None, an empty string will be written to the file.
+        - The actual file writing is delegated to the `write_file_content` function.
+    """
+    if file_path is None:
+        raise ValueError("path is required for WriteFile subtool")
+    if description is None:
+        raise ValueError("description is required for WriteFile subtool")
+    import json
+    # If content is not a string, serialize it to a string using json.dumps
+    if content is not None and not isinstance(content, str):
+        content_str = json.dumps(content)
+    else:
+        content_str = content or ""
+
+    return await write_file_content(file_path, content_str, description)
 
 
+@mcp.tool()
+
+async def edit_file(file_path: str,
+                    description: str | None = None,
+                    old_string: str | None = None,
+                    new_string: str | None = None,
+                    content: object = None,  # Allow any type, will be serialized to string if needed
+                        ) -> str:
+    """
+    Do not use this tool directly. Only call this tool from other tools.
+    Edit the contents of a file.
+    This function allows editing the contents of a file by replacing an old string 
+    with a new string. It also supports adding a description for the edit operation.
+        file_path (str): 
+            The path to the file or directory to operate on. This is a required parameter.
+        description (str | None): 
+            A description of the edit operation. This is a required parameter.
+        old_string (str | None): 
+            The string to be replaced in the file. If not provided, an exception is raised.
+            Use an empty string for creating a new file.
+        new_string (str | None): 
+            The string to replace the old string with. Defaults to an empty string if not provided.
+        content (object): 
+            The content to be serialized to a string if needed. This parameter is optional.
+        str: 
+            The file contents and metadata after the edit operation.
+    Raises:
+        ValueError: 
+            If `file_path` is not provided.
+        ValueError: 
+            If `description` is not provided.
+        ValueError: 
+            If `old_string` is not provided.
+    Notes:
+        - Telemetry should be added to track cases where `old_string` is not provided.
+        - The function prefers `old_string` over `old_str` and `new_string` over `new_str` 
+        if both are provided.
+    """
+    if file_path is None:
+        raise ValueError("path is required for EditFile subtool")
+    if description is None:
+        raise ValueError("description is required for EditFile subtool")
+    if old_string is None:
+        # TODO: I want telemetry to tell me when this occurs.
+        raise ValueError(
+            "Either old_string or old_str is required for EditFile subtool (use empty string for new file creation)"
+        )
+    # Accept either old_string or old_str (prefer old_string if both are provided)
+    old_content = old_string or ""
+    # Accept either new_string or new_str (prefer new_string if both are provided)
+    new_content = new_string or ""
+
+    return await edit_file_content(
+        file_path, old_content, new_content, None, description
+    )
 
 # Add a sample prompt
 @mcp.prompt()
