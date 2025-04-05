@@ -6,7 +6,6 @@ import os
 import json
 import uuid
 import shutil
-from pathlib import Path
 from tools.read_file import read_file_content
 from tools.write_file import write_file_content
 from tools.edit_file import edit_file_content
@@ -68,6 +67,8 @@ def save_claude_config(config: Dict[str, Any]) -> None:
 
     with open(CLAUDE_CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
+
+
 
 
 # Create an MCP server
@@ -497,24 +498,47 @@ async def vibecodemcp(  *,
                         arguments: str | None = None,
                         user_prompt: str | None = None,
                         thought: str | None = None,
+                        Server_Name: str | None = None,
+                        Server_Id: str | None = None,
                     ) -> str:
     """
-    Do not invoke this tool when prompt contains have any of the following tools - 
-    - create_server - Create a new MCP server
-    - list_servers - List all managed MCP servers
-    - remove_server - Remove a server by name
-    - create_tool - Add a new tool to an existing server
-    - remove_tool - Remove a tool from a server
-    - list_tools - List all tools in a specific server
-    This will return instructions which you should IMMEDIATELY follow before continuing.
-    In each response after the first one, you must call the UserPrompt tool
-    with the user's verbatim message text.
-    Arguments:
-    subtool: The subtool to run (InitProject, UserPrompt, Think, ...)
-    path: The path to the file or directory to operate on
-    user_prompt: The user's original prompt verbatim, starting AFTER instructions to initialize codemcp
-    thought: The thought content for the Think tool (used for complex reasoning or cache memory)
-    ... (there are other arguments which are documented later)
+    Only use this tool if you want to write code to a server.
+    If you do not have path to a server, use list server tool.
+    There is server.py file in every server directory. PLEASE ONLY EDIT THAT FILE.
+    After every use of this tool, use it again.
+    There are several subtools available:
+    - ReadFile: Read the contents of a file.
+    - WriteFile: Write content to a file.
+    - EditFile: Edit the contents of a file by replacing old_string with new_string.
+    - UserPrompt: Send a user prompt to the server.
+    - Think: Use it before writing or editing anything.
+    - Create Tool: Create a new tool in the server.
+
+    Args:
+        subtool: The subtool to use (ReadFile, WriteFile, EditFile, UserPrompt, Think).
+        path: The path to the file (for ReadFile, WriteFile, EditFile).
+        content: The content to write (for WriteFile).
+        old_string: The string to be replaced (for EditFile).
+        new_string: The string to replace the old string with (for EditFile).
+        offset: The offset to start reading from (for ReadFile).
+        limit: The maximum number of lines to read (for ReadFile).
+        description: A description of the operation (for WriteFile, EditFile).
+        pattern: A pattern to match (for ReadFile).
+        include: A string to include (for ReadFile).
+        arguments: The arguments for the command (for UserPrompt).
+        Server Name: The name of the server (for RegisterTool).
+        Server Id: The ID of the server (for RegisterTool).
+
+
+    returns:
+        if subtool is ReadFile, returns the content of the file.
+        if subtool is WriteFile, returns a confirmation message.
+        if subtool is EditFile, returns a confirmation message.
+        if subtool is UserPrompt, returns a confirmation message.
+        if subtool is Think, returns a confirmation message.
+        if subtool is Create Tool, returns a instructions on How to do that.
+
+
     """
     try:
         # Define expected parameters for each subtool
@@ -531,6 +555,8 @@ async def vibecodemcp(  *,
             },
             "UserPrompt": {"user_prompt"},
             "Think": {"thought"},
+            "Create Tool": {"path", "content", "description"},
+            "RegisterTool": {"Server Name", "Server Id"},
         }
         # Normalize string inputs to ensure consistent newlines
         def normalize_newlines(s: object) -> object:
@@ -572,6 +598,21 @@ async def vibecodemcp(  *,
         }
 
         # Now handle each subtool with its expected parameters
+        if subtool == "Create Tool":
+
+            return "Follow the instructions to create a tool. \
+                1. Use the 'ReadFile' subcommand to read the server.py file of the server. \
+                2. Use the 'Editfile' subcommand to edit the server.py code and add the new tool.  \
+                3. Use the 'RegisterTool' subcommand to register the new tool in the server."
+        
+        if subtool == "RegisterTool":
+            if Server_Name is None:
+                raise ValueError("Server Name is required for RegisterTool subtool")
+            if Server_Id is None:
+                raise ValueError("Server Id is required for RegisterTool subtool")
+            
+            return await register_tool(Server_Name, Server_Id)
+
         if subtool == "ReadFile":
             if path is None:
                 raise ValueError("path is required for ReadFile subtool")
@@ -622,7 +663,8 @@ async def vibecodemcp(  *,
 
     except Exception as e:
         logger.error(f"Error in create_tool: {e}")
-        raise
+        raise ValueError(f"Error in create_tool: {e}")
+    return "Tool executed successfully"
 
 
 
