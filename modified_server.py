@@ -7,6 +7,11 @@ import json
 import uuid
 import shutil
 from pathlib import Path
+from tools.read_file import read_file_content
+from tools.write_file import write_file_content
+from tools.edit_file import edit_file_content
+
+
 
 # Constants
 DATABASE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "servers_db.json")
@@ -382,128 +387,130 @@ async def edit_file(file_path: str, description: str = None, old_string: str = N
 
 # Add create-tool tool
 @mcp.tool()
-async def create_tool(server_name: str, tool_name: str, tool_description: str, parameters: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def create_tool(  *,
+                        subtool: str,
+                        path: Optional[str] = None,
+                        content: object = None,  # Allow any type, will be serialized to string if needed
+                        server_name: str, 
+                        tool_name: str, 
+                        tool_description: str,
+                        old_string: str | None = None,
+                        new_string: str | None = None,
+                        offset: int | None = None,
+                        limit: int | None = None,
+                        description: str | None = None,
+                        pattern: str | None = None,
+                        include: str | None = None,
+                        command: str | None = None,
+                        arguments: str | None = None,
+                    ) -> str:
     """
-    Create a new tool in an existing MCP server
-    
-    Args:
-        server_name: Name of the server to add the tool to
-        tool_name: Name of the tool to create (snake_case)
-        tool_description: Description of what the tool does
-        parameters: List of parameter definitions, each with 'name', 'type', and 'description' keys
-            Example: [{"name": "message", "type": "str", "description": "The message to process"}]
-    
-    Returns:
-        Information about the created tool
+    This will return instructions which you should IMMEDIATELY follow before continuing.
+    In each response after the first one, you must call the UserPrompt tool
+    with the user's verbatim message text.
+    Arguments:
+    subtool: The subtool to run (InitProject, UserPrompt, Think, ...)
+    path: The path to the file or directory to operate on
+    user_prompt: The user's original prompt verbatim, starting AFTER instructions to initialize codemcp
+    thought: The thought content for the Think tool (used for complex reasoning or cache memory)
+    ... (there are other arguments which are documented later)
     """
-    # Find the server by name
-    db = load_database()
-    server_id = None
-    server_data = None
-    
-    for sid, data in db["servers"].items():
-        if data["name"] == server_name:
-            server_id = sid
-            server_data = data
-            break
-    
-    if not server_id:
-        raise ValueError(f"No server found with name '{server_name}'")
-    
-    # Check if tool name follows Python naming conventions (snake_case)
-    if not all(c.islower() or c.isdigit() or c == '_' for c in tool_name):
-        raise ValueError("Tool name must be in snake_case (lowercase with underscores)")
-    
-    # Initialize parameters list if not provided
-    if parameters is None:
-        parameters = []
-    
-    # Validate parameters format
-    for param in parameters:
-        if not all(key in param for key in ["name", "type", "description"]):
-            raise ValueError("Each parameter must have 'name', 'type', and 'description' keys")
-    
-    # Read the server.py file
-    server_file_path = os.path.join(server_data["location"], "server.py")
-    if not os.path.exists(server_file_path):
-        raise FileNotFoundError(f"Server file not found at {server_file_path}")
-    
-    with open(server_file_path, 'r', encoding='utf-8') as f:
-        server_code = f.read()
-    
-    # Determine insertion point
-    # Look for if __name__ == "__main__": to find where to insert the tool
-    insertion_point = server_code.find('if __name__ == "__main__":')
-    if insertion_point == -1:
-        # Fallback: insert at the end
-        insertion_point = len(server_code)
-    
-    # Generate parameter string
-    param_strings = []
-    typed_params = []
-    
-    for param in parameters:
-        param_name = param["name"]
-        param_type = param["type"]
-        typed_params.append(f"{param_name}: {param_type}")
-        param_strings.append(f"        {param_name}: {param['description']}")
-    
-    # Create the tool code with proper indentation
-    tool_code = f"""
-# {tool_name} tool
-@mcp.tool()
-def {tool_name}({', '.join(typed_params)}) -> Dict[str, Any]:
-    \"\"\"
-    {tool_description}
-    
-    Args:
-{os.linesep.join(param_strings) if param_strings else '        None'}
-    
-    Returns:
-        A dictionary containing the result
-    \"\"\"
-    # TODO: Implement the tool functionality
-    result = {{
-        "status": "success",
-        "message": "Tool executed successfully"
-    }}
-    return result
+    try:
+        # Define expected parameters for each subtool
+        expected_params = {
+            "ReadFile": {"path", "offset", "limit"},
+            "WriteFile": {"path", "content", "description"},
+            "EditFile": {
+                "path",
+                "old_string",
+                "new_string",
+                "description",
+                "old_str",
+                "new_str",
+            }
+        }
+        # Normalize string inputs to ensure consistent newlines
+        def normalize_newlines(s: object) -> object:
+            """Normalize string to use \n for all newlines."""
+            return s.replace("\r\n", "\n") if isinstance(s, str) else s
 
-"""
+        # Normalize content, old_string, and new_string to use consistent \n newlines
+        content_norm = normalize_newlines(content)
+        old_string_norm = normalize_newlines(old_string)
+        new_string_norm = normalize_newlines(new_string)
 
-    # Insert the tool code
-    new_server_code = server_code[:insertion_point] + tool_code + server_code[insertion_point:]
-    
-    # Write back the updated server code
-    with open(server_file_path, 'w', encoding='utf-8') as f:
-        f.write(new_server_code)
-    
-    # Update the database
-    tool_entry = {
-        "name": tool_name,
-        "description": tool_description,
-        "parameters": parameters
-    }
-    
-    if "tools" not in server_data:
-        server_data["tools"] = {}
-    
-    server_data["tools"][tool_name] = tool_entry
-    server_data["tool_count"] = len(server_data["tools"])
-    
-    # Save the updated database
-    db["servers"][server_id] = server_data
-    save_database(db)
-    
-    logger.info(f"Created tool '{tool_name}' in server '{server_name}'")
-    
-    return {
-        "server_name": server_name,
-        "tool_name": tool_name,
-        "description": tool_description,
-        "parameters": parameters,
-        "file_path": server_file_path
-    }
+        # Check if subtool exists
+        if subtool not in expected_params:
+            raise ValueError(
+                f"Unknown subtool: {subtool}. Available subtools: {', '.join(expected_params.keys())}"
+            )
+        
+        # Get all provided non-None parameters
+        provided_params = {
+            param: value
+            for param, value in {
+                "path": path,
+                "content": content_norm,
+                "old_string": old_string_norm,
+                "new_string": new_string_norm,
+                "offset": offset,
+                "limit": limit,
+                "description": description,
+                "pattern": pattern,
+                "include": include,
+                "command": command,
+                "arguments": arguments,
+            }.items()
+            if value is not None
+        }
+
+        # Now handle each subtool with its expected parameters
+        if subtool == "ReadFile":
+            if path is None:
+                raise ValueError("path is required for ReadFile subtool")
+
+            return await read_file_content(path, offset, limit)
+
+        if subtool == "WriteFile":
+            if path is None:
+                raise ValueError("path is required for WriteFile subtool")
+            if description is None:
+                raise ValueError("description is required for WriteFile subtool")
+
+            import json
+
+            # If content is not a string, serialize it to a string using json.dumps
+            if content is not None and not isinstance(content, str):
+                content_str = json.dumps(content)
+            else:
+                content_str = content or ""
+
+            return await write_file_content(path, content_str, description, chat_id)
+
+        if subtool == "EditFile":
+            if path is None:
+                raise ValueError("path is required for EditFile subtool")
+            if description is None:
+                raise ValueError("description is required for EditFile subtool")
+            if old_string is None:
+                # TODO: I want telemetry to tell me when this occurs.
+                raise ValueError(
+                    "Either old_string or old_str is required for EditFile subtool (use empty string for new file creation)"
+                )
+
+            # Accept either old_string or old_str (prefer old_string if both are provided)
+            old_content = old_string  or ""
+            # Accept either new_string or new_str (prefer new_string if both are provided)
+            new_content = new_string  or ""
+            return await edit_file_content(
+                path, old_content, new_content, None, description
+            )
+
+
+
+    except Exception as e:
+        logger.error(f"Error in create_tool: {e}")
+        raise
 
 # Add a sample prompt
 @mcp.prompt()

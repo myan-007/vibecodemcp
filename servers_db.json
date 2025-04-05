@@ -5,8 +5,55 @@
       "name": "SumGmail",
       "description": "A server that summarizes daily emails and categorizes them into relevant groups for easy review.",
       "location": "/Users/meet/Documents/python/projects/mcp/vibecodemcp/mcp-servers/SumGmail",
-      "tool_count": 0,
-      "tools": {}
+      "tool_count": 2,
+      "tools": {
+        "deff727d-c831-4b1c-9b0c-337caf506f10": {
+          "id": "deff727d-c831-4b1c-9b0c-337caf506f10",
+          "name": "DailyWeatherBrief",
+          "description": "Checks the current day's weather conditions and provides a concise summary including temperature, precipitation, and notable weather events.",
+          "parameters": [
+            {
+              "name": "location",
+              "type": "str=\"New York\""
+            },
+            {
+              "name": "units",
+              "type": "str=\"metric\""
+            }
+          ]
+        },
+        "create_summary": {
+          "name": "create_summary",
+          "description": "Creates a summary of emails, organizing them into relevant categories for easy review.",
+          "parameters": [
+            {
+              "name": "time_period",
+              "type": "str",
+              "description": "The time period to summarize (e.g., 'today', 'yesterday', 'week', 'custom')"
+            },
+            {
+              "name": "start_date",
+              "type": "str",
+              "description": "Start date for custom time period (format: YYYY-MM-DD). Required if time_period is 'custom'."
+            },
+            {
+              "name": "end_date",
+              "type": "str",
+              "description": "End date for custom time period (format: YYYY-MM-DD). Required if time_period is 'custom'."
+            },
+            {
+              "name": "categories",
+              "type": "list",
+              "description": "List of categories to organize emails into (e.g., ['Work', 'Personal', 'Finance']). Default categories will be used if not provided."
+            },
+            {
+              "name": "include_read",
+              "type": "bool",
+              "description": "Whether to include already read emails in the summary (default: False)"
+            }
+          ]
+        }
+      }
     }
   }
 }

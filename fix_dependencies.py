@@ -82,29 +82,25 @@ __all__ = [
 ]
 
 async def check_file_path_and_permissions(file_path: str) -> Tuple[bool, Optional[str]]:
-    """Check if the file path is valid and has the necessary permissions."""
     # Check that the path is absolute
     if not os.path.isabs(file_path):
         return False, f"File path must be absolute, not relative: {file_path}"
     return True, None
 
 async def check_git_tracking_for_existing_file(file_path: str, chat_id: str = "") -> Tuple[bool, Optional[str]]:
-    """Check if an existing file is tracked by git. Always returns True for simplicity."""
     return True, None
 
 def ensure_directory_exists(file_path: str) -> None:
-    """Ensure the directory for the file exists, creating it if necessary."""
     directory = os.path.dirname(file_path)
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
 
 async def async_open_text(file_path: str, mode="r", encoding="utf-8", errors="replace") -> str:
-    """Asynchronously open and read a text file."""
+
     async with await anyio.open_file(file_path, mode, encoding=encoding, errors=errors) as f:
         return await f.read()
 
 async def write_text_content(file_path: str, content: str, encoding="utf-8", line_endings=None) -> None:
-    """Write text content to a file."""
     ensure_directory_exists(file_path)
     async with await anyio.open_file(file_path, "w", encoding=encoding, newline="") as f:
         await f.write(content)
@@ -130,7 +126,6 @@ __all__ = [
 ]
 
 def normalize_to_lf(content: str) -> str:
-    """Normalize all line endings to LF (\\n)."""
     # First replace CRLF with LF
     normalized = content.replace("\\r\\n", "\\n")
     # Then handle any lone CR characters
@@ -138,7 +133,7 @@ def normalize_to_lf(content: str) -> str:
     return normalized
 
 def apply_line_endings(content: str, line_ending: str = None) -> str:
-    """Apply the specified line ending to the content."""
+
     if line_ending is None:
         return content
     elif line_ending.upper() == "CRLF":
@@ -146,13 +141,11 @@ def apply_line_endings(content: str, line_ending: str = None) -> str:
     return content
 
 async def detect_line_endings(file_path: str, return_format: Literal["str", "format"] = "str") -> str:
-    """Detect the line endings of a file."""
     if return_format == "format":
         return "LF"
     return "\\n"
 
 def detect_repo_line_endings(directory: str, return_format: Literal["str", "format"] = "str") -> str:
-    """Detect the line endings to use for new files in a repository."""
     if return_format == "format":
         return "LF"
     return "\\n"
@@ -195,14 +188,12 @@ __all__ = [
 ]
 
 def normalize_file_path(file_path: str) -> str:
-    """Normalize a file path to an absolute path."""
     expanded_path = os.path.expanduser(file_path)
     if not os.path.isabs(expanded_path):
         return os.path.abspath(os.path.join(os.getcwd(), expanded_path))
     return os.path.abspath(expanded_path)
 
 def get_edit_snippet(original_text: str, old_str: str, new_str: str, context_lines: int = 4) -> str:
-    """Generate a snippet of the edited file showing the changes with line numbers."""
     # Find where the edit occurs
     before_text = original_text.split(old_str)[0]
     before_lines = before_text.split("\\n")
@@ -231,7 +222,6 @@ def get_edit_snippet(original_text: str, old_str: str, new_str: str, context_lin
     return "\\n".join(result)
 
 def truncate_output_content(content: Union[str, bytes, None], prefer_end: bool = True) -> str:
-    """Truncate command output content to a reasonable size."""
     if content is None:
         return ""
     if not content:
@@ -281,7 +271,6 @@ def truncate_output_content(content: Union[str, bytes, None], prefer_end: bool =
     content = """#!/usr/bin/env python3
 
 def match(pattern: str, path: str, *, editorconfig: bool = False) -> bool:
-    """Simple implementation of pattern matching."""
     # Just return True for simplicity
     return True
 """
@@ -317,7 +306,6 @@ async def async_open_text(
     encoding: str = "utf-8",
     errors: str = "replace",
 ) -> str:
-    """Asynchronously open and read a text file."""
     async with await anyio.open_file(
         file_path, mode, encoding=encoding, errors=errors
     ) as f:
@@ -326,7 +314,6 @@ async def async_open_text(
 async def async_readlines(
     file_path: str, encoding: str = "utf-8", errors: str = "replace"
 ) -> List[str]:
-    """Asynchronously read lines from a text file."""
     async with await anyio.open_file(
         file_path, "r", encoding=encoding, errors=errors
     ) as f:
@@ -338,7 +325,6 @@ async def async_write_text(
     mode: OpenTextMode = "w",
     encoding: str = "utf-8",
 ) -> None:
-    """Asynchronously write text to a file."""
     async with await anyio.open_file(
         file_path, mode, encoding=encoding, newline=""
     ) as f:

@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+setup.py
+vibecodemcp.egg-info/PKG-INFO
+vibecodemcp.egg-info/SOURCES.txt
+vibecodemcp.egg-info/dependency_links.txt
+vibecodemcp.egg-info/requires.txt
+vibecodemcp.egg-info/top_level.txt

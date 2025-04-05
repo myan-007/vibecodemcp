@@ -3,7 +3,10 @@ name = "vibecodemcp"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 dependencies = [
+    "editorconfig>=0.17.0",
     "mcp[cli]>=1.6.0",
+    "setuptools>=78.1.0",
+    "tomli>=2.2.1",
 ]
