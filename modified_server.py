@@ -14,7 +14,6 @@ from tools.user_prompt import user_prompt as user_prompt_tool
 
 
 
-
 # Constants
 DATABASE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "servers_db.json")
 SERVERS_DIR = "/Users/meet/Documents/python/projects/mcp/vibecodemcp/mcp-servers/"
@@ -403,175 +402,6 @@ async def list_tools(server_name: str) -> Dict[str, Any]:
     
     return f"Successfully edited {file_path}\n\nHere's a snippet of the edited file:\n{snippet}"
 
-# Add create-tool tool
-@mcp.tool()
-async def vibecodemcp(  *,
-                        subtool: str,
-                        path: Optional[str] = None,
-                        content: object = None,  # Allow any type, will be serialized to string if needed
-                        server_name: str, 
-                        tool_name: str, 
-                        tool_description: str,
-                        old_string: str | None = None,
-                        new_string: str | None = None,
-                        offset: int | None = None,
-                        limit: int | None = None,
-                        description: str | None = None,
-                        pattern: str | None = None,
-                        include: str | None = None,
-                        command: str | None = None,
-                        arguments: str | None = None,
-                        user_prompt: str | None = None,
-                        thought: str | None = None,
-                    ) -> str:
-    """
-    Only use this tool if and only if the user prompt contains with vibecodemcp.
-    This will return instructions which you should IMMEDIATELY follow before continuing.
-    In each response after the first one, you must call the UserPrompt tool
-    with the user's verbatim message text.
-    Arguments:
-    subtool: The subtool to run (InitProject, UserPrompt, Think, ...)
-    path: The path to the file or directory to operate on
-    user_prompt: The user's original prompt verbatim, starting AFTER instructions to initialize codemcp
-    thought: The thought content for the Think tool (used for complex reasoning or cache memory)
-    ... (there are other arguments which are documented later)
-    """
-    try:
-        # Define expected parameters for each subtool
-        expected_params = {
-            "ReadFile": {"path", "offset", "limit"},
-            "WriteFile": {"path", "content", "description"},
-            "EditFile": {
-                "path",
-                "old_string",
-                "new_string",
-                "description",
-                "old_str",
-                "new_str",
-            },
-            "UserPrompt": {"user_prompt"},
-            "Think": {"thought"},
-        }
-        # Normalize string inputs to ensure consistent newlines
-        def normalize_newlines(s: object) -> object:
-            """Normalize string to use \n for all newlines."""
-            return s.replace("\r\n", "\n") if isinstance(s, str) else s
-
-        # Normalize content, old_string, and new_string to use consistent \n newlines
-        content_norm = normalize_newlines(content)
-        old_string_norm = normalize_newlines(old_string)
-        new_string_norm = normalize_newlines(new_string)
-        user_prompt_norm = normalize_newlines(user_prompt)
-
-
-        # Check if subtool exists
-        if subtool not in expected_params:
-            raise ValueError(
-                f"Unknown subtool: {subtool}. Available subtools: {', '.join(expected_params.keys())}"
-            )
-        
-        # Get all provided non-None parameters
-        provided_params = {
-            param: value
-            for param, value in {
-                "path": path,
-                "content": content_norm,
-                "old_string": old_string_norm,
-                "new_string": new_string_norm,
-                "offset": offset,
-                "limit": limit,
-                "description": description,
-                "pattern": pattern,
-                "include": include,
-                "command": command,
-                "arguments": arguments,
-                "user_prompt": user_prompt_norm,
-                "thought": thought,
-            }.items()
-            if value is not None
-        }
-
-        # Now handle each subtool with its expected parameters
-        if subtool == "ListTools":
-            if path is None:
-                raise ValueError("path is required for list_tools subtool")
-
-            return await list_tools(path)
-        if subtool == "ListServers":
-            if path is None:
-                raise ValueError("path is required for list_servers subtool")
-
-            return await list_servers(path)
-        if subtool == "CreateServer":
-            if path is None:
-                raise ValueError("path is required for create_server subtool")
-            if server_name is None:
-                raise ValueError("server_name is required for create_server subtool")
-            if tool_name is None:
-                raise ValueError("tool_name is required for create_server subtool")
-            if tool_description is None:
-                raise ValueError("tool_description is required for create_server subtool")
-
-            return await create_server(path, server_name, tool_name, tool_description)
-        if subtool == "RemoveServer": 
-            if path is None:
-                raise ValueError("path is required for remove_server subtool")
-            if server_name is None:
-                raise ValueError("server_name is required for remove_server subtool")
-
-            return await remove_server(path, server_name)
-        if subtool == "ReadFile":
-            if path is None:
-                raise ValueError("path is required for ReadFile subtool")
-
-            return await read_file_content(path, offset, limit)
-
-        if subtool == "WriteFile":
-            if path is None:
-                raise ValueError("path is required for WriteFile subtool")
-            if description is None:
-                raise ValueError("description is required for WriteFile subtool")
-
-            import json
-
-            # If content is not a string, serialize it to a string using json.dumps
-            if content is not None and not isinstance(content, str):
-                content_str = json.dumps(content)
-            else:
-                content_str = content or ""
-
-            return await write_file_content(path, content_str, description)
-
-        if subtool == "EditFile":
-            if path is None:
-                raise ValueError("path is required for EditFile subtool")
-            if description is None:
-                raise ValueError("description is required for EditFile subtool")
-            if old_string is None:
-                # TODO: I want telemetry to tell me when this occurs.
-                raise ValueError(
-                    "Either old_string or old_str is required for EditFile subtool (use empty string for new file creation)"
-                )
-
-            # Accept either old_string or old_str (prefer old_string if both are provided)
-            old_content = old_string  or ""
-            # Accept either new_string or new_str (prefer new_string if both are provided)
-            new_content = new_string  or ""
-            return await edit_file_content(
-                path, old_content, new_content, None, description
-            )
-        if subtool == "UserPrompt":
-            if user_prompt is None:
-                raise ValueError("user_prompt is required for UserPrompt subtool")
-
-            return await user_prompt_tool(user_prompt)
-
-
-
-    except Exception as e:
-        logger.error(f"Error in create_tool: {e}")
-        raise
-
 
 # Add remove-tool tool
 @mcp.tool()
@@ -649,6 +479,153 @@ async def remove_tool(server_name: str, tool_name: str) -> Dict[str, Any]:
         "tool_info": tool_info,
         "status": "removed"
     }
+
+# Add create-tool tool
+@mcp.tool()
+async def vibecodemcp(  *,
+                        subtool: str,
+                        path: Optional[str] = None,
+                        content: object = None,  # Allow any type, will be serialized to string if needed
+                        old_string: str | None = None,
+                        new_string: str | None = None,
+                        offset: int | None = None,
+                        limit: int | None = None,
+                        description: str | None = None,
+                        pattern: str | None = None,
+                        include: str | None = None,
+                        command: str | None = None,
+                        arguments: str | None = None,
+                        user_prompt: str | None = None,
+                        thought: str | None = None,
+                    ) -> str:
+    """
+    Do not invoke this tool when prompt contains have any of the following tools - 
+    - create_server - Create a new MCP server
+    - list_servers - List all managed MCP servers
+    - remove_server - Remove a server by name
+    - create_tool - Add a new tool to an existing server
+    - remove_tool - Remove a tool from a server
+    - list_tools - List all tools in a specific server
+    This will return instructions which you should IMMEDIATELY follow before continuing.
+    In each response after the first one, you must call the UserPrompt tool
+    with the user's verbatim message text.
+    Arguments:
+    subtool: The subtool to run (InitProject, UserPrompt, Think, ...)
+    path: The path to the file or directory to operate on
+    user_prompt: The user's original prompt verbatim, starting AFTER instructions to initialize codemcp
+    thought: The thought content for the Think tool (used for complex reasoning or cache memory)
+    ... (there are other arguments which are documented later)
+    """
+    try:
+        # Define expected parameters for each subtool
+        expected_params = {
+            "ReadFile": {"path", "offset", "limit"},
+            "WriteFile": {"path", "content", "description"},
+            "EditFile": {
+                "path",
+                "old_string",
+                "new_string",
+                "description",
+                "old_str",
+                "new_str",
+            },
+            "UserPrompt": {"user_prompt"},
+            "Think": {"thought"},
+        }
+        # Normalize string inputs to ensure consistent newlines
+        def normalize_newlines(s: object) -> object:
+            """Normalize string to use \n for all newlines."""
+            return s.replace("\r\n", "\n") if isinstance(s, str) else s
+
+        # Normalize content, old_string, and new_string to use consistent \n newlines
+        content_norm = normalize_newlines(content)
+        old_string_norm = normalize_newlines(old_string)
+        new_string_norm = normalize_newlines(new_string)
+        user_prompt_norm = normalize_newlines(user_prompt)
+
+
+        # Check if subtool exists
+        if subtool not in expected_params:
+            raise ValueError(
+                f"Unknown subtool: {subtool}. Available subtools: {', '.join(expected_params.keys())}"
+            )
+        
+        # Get all provided non-None parameters
+        provided_params = {
+            param: value
+            for param, value in {
+                "path": path,
+                "content": content_norm,
+                "old_string": old_string_norm,
+                "new_string": new_string_norm,
+                "offset": offset,
+                "limit": limit,
+                "description": description,
+                "pattern": pattern,
+                "include": include,
+                "command": command,
+                "arguments": arguments,
+                "user_prompt": user_prompt_norm,
+                "thought": thought,
+            }.items()
+            if value is not None
+        }
+
+        # Now handle each subtool with its expected parameters
+        if subtool == "ReadFile":
+            if path is None:
+                raise ValueError("path is required for ReadFile subtool")
+
+            return await read_file_content(path, offset, limit)
+
+        if subtool == "WriteFile":
+            if path is None:
+                raise ValueError("path is required for WriteFile subtool")
+            if description is None:
+                raise ValueError("description is required for WriteFile subtool")
+
+            import json
+
+            # If content is not a string, serialize it to a string using json.dumps
+            if content is not None and not isinstance(content, str):
+                content_str = json.dumps(content)
+            else:
+                content_str = content or ""
+
+            return await write_file_content(path, content_str, description)
+
+        if subtool == "EditFile":
+            if path is None:
+                raise ValueError("path is required for EditFile subtool")
+            if description is None:
+                raise ValueError("description is required for EditFile subtool")
+            if old_string is None:
+                # TODO: I want telemetry to tell me when this occurs.
+                raise ValueError(
+                    "Either old_string or old_str is required for EditFile subtool (use empty string for new file creation)"
+                )
+
+            # Accept either old_string or old_str (prefer old_string if both are provided)
+            old_content = old_string  or ""
+            # Accept either new_string or new_str (prefer new_stringcla if both are provided)
+            new_content = new_string  or ""
+            return await edit_file_content(
+                path, old_content, new_content, None, description
+            )
+        if subtool == "UserPrompt":
+            if user_prompt is None:
+                raise ValueError("user_prompt is required for UserPrompt subtool")
+
+            return await user_prompt_tool(user_prompt)
+
+
+
+    except Exception as e:
+        logger.error(f"Error in create_tool: {e}")
+        raise
+
+
+
 
 # Add a sample prompt
 @mcp.prompt()

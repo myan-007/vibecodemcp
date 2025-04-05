@@ -1,3 +1,12 @@
 {
-  "servers": {}
+  "servers": {
+    "2c58a7d0-1ee5-4547-8fad-aa88b92516d3": {
+      "id": "2c58a7d0-1ee5-4547-8fad-aa88b92516d3",
+      "name": "summary-news",
+      "description": "A server that retrieves daily news using a free news API",
+      "location": "/Users/meet/Documents/python/projects/mcp/vibecodemcp/mcp-servers/summary-news",
+      "tool_count": 0,
+      "tools": {}
+    }
+  }
 }
